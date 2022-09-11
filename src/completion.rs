@@ -206,7 +206,7 @@ mod tests {
     use std::ops::Add;
     use super::*;
 
-    fn compare(
+    fn compare_format_suggestions(
         suggestions: Vec<Suggestion>,
         width: usize,
         expected: Vec<Suggestion>,
@@ -242,7 +242,7 @@ mod tests {
         let max = 100;
         let ex_wdith = 6;
         let (suggestions, width) = format_suggestions(&input, max);
-        compare(suggestions, width, expected, ex_wdith);
+        compare_format_suggestions(suggestions, width, expected, ex_wdith);
     }
 
     #[test]
@@ -260,7 +260,7 @@ mod tests {
         let max = 100;
         let ex_wdith = " apple   ".to_string().add(" This is apple.   ").len();
         let (suggestions, width) = format_suggestions(&input, max);
-        compare(suggestions, width, expected, ex_wdith);
+        compare_format_suggestions(suggestions, width, expected, ex_wdith);
     }
 
     #[test]
@@ -278,7 +278,7 @@ mod tests {
         let max = 8;
         let ex_wdith = 8;
         let (suggestions, width) = format_suggestions(&input, max);
-        compare(suggestions, width, expected, ex_wdith);
+        compare_format_suggestions(suggestions, width, expected, ex_wdith);
     }
 
     #[test]
@@ -292,7 +292,7 @@ mod tests {
         let max = 3;
         let ex_wdith = 0;
         let (suggestions, width) = format_suggestions(&input, max);
-        compare(suggestions, width, expected, ex_wdith);
+        compare_format_suggestions(suggestions, width, expected, ex_wdith);
     }
 
     #[test]
@@ -317,7 +317,7 @@ mod tests {
         let ex_wdith = expected.last().unwrap().text.len() +
             expected.last().unwrap().description.len();
         let (suggestions, width) = format_suggestions(&input, max);
-        compare(suggestions, width, expected, ex_wdith);
+        compare_format_suggestions(suggestions, width, expected, ex_wdith);
     }
 
     #[test]
@@ -342,6 +342,70 @@ mod tests {
         let ex_wdith = expected.last().unwrap().text.len() +
             expected.last().unwrap().description.len();
         let (suggestions, width) = format_suggestions(&input, max);
-        compare(suggestions, width, expected, ex_wdith);
+        compare_format_suggestions(suggestions, width, expected, ex_wdith);
+    }
+
+    fn compare_format_text(input: Vec<String>, width: usize, expected: Vec<&str>, ex_width: usize) {
+        if width != ex_width {
+            panic!("width got: {}, want: {}", width, ex_width);
+        }
+
+        if input.len() != expected.len() {
+            panic!("len got: {}, want: {}", input.len(), expected.len());
+        }
+
+        if !input.eq(&expected) {
+            panic!("result got: {:?}, want: {:?}", input, expected);
+        }
+    }
+
+    #[test]
+    fn test_format_text_blank() {
+        let input = vec!["", ""];
+        let expected = vec!["", ""];
+        let max = 10;
+        let ex_width = 0;
+        let (actual, width) = format_texts(&input, max, " ", " ");
+        compare_format_text(actual, width, expected, ex_width);
+    }
+
+    #[test]
+    fn test_format_text_small_max() {
+        let input = vec!["apple", "banana", "coconut"];
+        let expected = vec!["", "", ""];
+        let max = 2;
+        let ex_width = 0;
+        let (actual, width) = format_texts(&input, max, " ", " ");
+        compare_format_text(actual, width, expected, ex_width);
+    }
+
+    #[test]
+    fn test_format_text_small_max_2() {
+        let input = vec!["apple", "banana", "coconut"];
+        let expected = vec!["", "", ""];
+        let max = (" ".to_string() + " " + SHORTEN_SUFFIX).len();
+        let ex_width = 0;
+        let (actual, width) = format_texts(&input, max, " ", " ");
+        compare_format_text(actual, width, expected, ex_width);
+    }
+
+    #[test]
+    fn test_format_text_example() {
+        let input = vec!["apple", "banana", "coconut"];
+        let expected = vec![" apple   ", " banana  ", " coconut "];
+        let max = 100;
+        let ex_width = expected.last().unwrap().len();
+        let (actual, width) = format_texts(&input, max, " ", " ");
+        compare_format_text(actual, width, expected, ex_width);
+    }
+
+    #[test]
+    fn test_format_text_shorten() {
+        let input = vec!["apple", "banana", "coconut"];
+        let expected = vec![" a... ", " b... ", " c... "];
+        let max = 6;
+        let ex_width = expected.last().unwrap().len();
+        let (actual, width) = format_texts(&input, max, " ", " ");
+        compare_format_text(actual, width, expected, ex_width);
     }
 }

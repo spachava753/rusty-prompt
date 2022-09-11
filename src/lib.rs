@@ -1,5 +1,3 @@
-extern crate core;
-
 mod key;
 mod completion;
 
