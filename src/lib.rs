@@ -1,5 +1,6 @@
 mod key;
 mod completion;
+mod document;
 
 #[cfg(test)]
 mod tests {
