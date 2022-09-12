@@ -81,7 +81,7 @@ impl Document {
             .unwrap_or(0) as i32
     }
 
-    /// Is almost the same as FindStartOfPreviousWord.
+    /// Is almost the same as [find_start_of_previous_word].
     /// The only difference is to ignore contiguous spaces.
     // TODO: replace return type with Option<i32>
     // TODO: consider returning unsigned num data type
@@ -204,6 +204,62 @@ impl Document {
                 }
             }
         }
+    }
+
+    ///Returns the word before the cursor.
+    /// If we have whitespace before the cursor this returns an empty string.
+    fn get_word_before_cursor(&self) -> String {
+        self.text_before_cursor()
+            .split_at(self.find_start_of_previous_word() as usize).1
+            .to_string()
+    }
+
+    /// Returns the word after the cursor.
+    /// If we have whitespace after the cursor this returns an empty string.
+    fn get_word_after_cursor(&self) -> String {
+        self.text_after_cursor()
+            .split_at(self.find_end_of_current_word() as usize).0
+            .to_string()
+    }
+
+    /// Returns the word before the cursor.
+    /// Unlike [get_word_before_cursor], it returns string containing space
+    fn get_word_before_cursor_with_space(&self) -> String {
+        self.text_before_cursor()
+            .split_at(self.find_start_of_previous_word_with_space() as usize).1
+            .to_string()
+    }
+
+    /// Returns the word after the cursor.
+    /// Unlike [get_word_after_cursor], it returns string containing space
+    fn get_word_after_cursor_with_space(&self) -> String {
+        self.text_after_cursor()
+            .split_at(self.find_end_of_current_word_with_space() as usize).0
+            .to_string()
+    }
+
+    /// Returns the text before the cursor until next separator.
+    fn get_word_before_cursor_until_separator<S: AsRef<str>>(&self, sep: S) -> String {
+        self.text_before_cursor().split_at(self.find_start_of_previous_word_until_separator(sep) as usize).1
+            .to_string()
+    }
+
+    /// Returns the text after the cursor until next separator.
+    fn get_word_after_cursor_until_separator<S: AsRef<str>>(&self, sep: S) -> String {
+        self.text_after_cursor().split_at(self.find_end_of_current_word_until_separator(sep) as usize).0
+            .to_string()
+    }
+
+    // Returns the word before the cursor.
+    // Unlike [get_word_before_cursor], it returns string containing space
+    fn get_word_before_cursor_until_separator_ignore_next_to_cursor<S: AsRef<str>>(&self, sep: S) -> String {
+        self.text_before_cursor().split_at(self.find_start_of_previous_word_until_separator_ignore_next_to_cursor(sep) as usize).1.to_string()
+    }
+
+    /// Returns the word after the cursor.
+    /// Unlike [get_word_after_cursor], it returns string containing space
+    fn get_word_after_cursor_until_separator_ignore_next_to_cursor<S: AsRef<str>>(&self, sep: S) -> String {
+        self.text_after_cursor().split_at(self.find_end_of_current_word_until_separator_ignore_next_to_cursor(sep) as usize).0.to_string()
     }
 }
 
@@ -595,4 +651,5 @@ mod tests {
             ..Default::default()
         }.find_end_of_current_word_until_separator_ignore_next_to_cursor(""));
     }
+
 }
