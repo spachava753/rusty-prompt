@@ -250,8 +250,8 @@ impl Document {
             .to_string()
     }
 
-    // Returns the word before the cursor.
-    // Unlike [get_word_before_cursor], it returns string containing space
+    /// Returns the word before the cursor.
+    /// Unlike [get_word_before_cursor], it returns string containing space
     fn get_word_before_cursor_until_separator_ignore_next_to_cursor<S: AsRef<str>>(&self, sep: S) -> String {
         self.text_before_cursor().split_at(self.find_start_of_previous_word_until_separator_ignore_next_to_cursor(sep) as usize).1.to_string()
     }
@@ -261,6 +261,27 @@ impl Document {
     fn get_word_after_cursor_until_separator_ignore_next_to_cursor<S: AsRef<str>>(&self, sep: S) -> String {
         self.text_after_cursor().split_at(self.find_end_of_current_word_until_separator_ignore_next_to_cursor(sep) as usize).0.to_string()
     }
+
+    /// Returns the text from the start of the line until the cursor.
+    fn current_line_before_cursor(&self) -> String {
+        self.text_before_cursor().split('\n')
+            .last()
+            .expect("expected at least one substring")
+            .to_string()
+    }
+
+    /// Returns the text from the cursor until the end of the line.
+    fn current_line_after_cursor(&self) -> String {
+        self.text_after_cursor().split('\n').take(1).collect::<String>()
+    }
+
+    /// Return the text on the line where the cursor is. (when the input
+    /// consists of just one line, it equals `text`.
+    fn current_line(&self) -> String {
+        self.current_line_before_cursor() + self.current_line_after_cursor().as_str()
+    }
+
+
 }
 
 #[cfg(test)]
@@ -350,16 +371,16 @@ mod tests {
     // TODO: consider using macros for testcases
     #[test]
     fn test_find_start_of_previous_word() {
-        // assert_eq!("apple ".len() as i32, Document {
-        //     text: "apple bana".to_string(),
-        //     cursor_position: "apple bana".len() as i32,
-        //     ..Default::default()
-        // }.find_start_of_previous_word());
-        // assert_eq!("apple ".len() as i32, Document {
-        //     text: "apple bana".to_string(),
-        //     cursor_position: "apple bana".len() as i32,
-        //     ..Default::default()
-        // }.find_start_of_previous_word_until_separator(""));
+        assert_eq!("apple ".len() as i32, Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple bana".len() as i32,
+            ..Default::default()
+        }.find_start_of_previous_word());
+        assert_eq!("apple ".len() as i32, Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple bana".len() as i32,
+            ..Default::default()
+        }.find_start_of_previous_word_until_separator(""));
 
         assert_eq!("apply -f ./file/".len() as i32, Document {
             text: "apply -f ./file/foo.json".to_string(),
@@ -651,5 +672,112 @@ mod tests {
             ..Default::default()
         }.find_end_of_current_word_until_separator_ignore_next_to_cursor(""));
     }
+    
+    #[test]
+    fn test_get_word_after_cursor() {
+        assert_eq!("", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple bana".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor());
+        assert_eq!("", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple bana".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator(""));
 
+        assert_eq!("le", Document {
+            text: "apply -f ./file/foo.json".to_string(),
+            cursor_position: "apply -f ./fi".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator("/"));
+
+        assert_eq!("bana", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple ".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor());
+        assert_eq!("bana", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple ".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator(""));
+
+        assert_eq!("", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor());
+        assert_eq!("", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "apple".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator(""));
+
+        assert_eq!("", Document {
+            text: "apply -f ./file/foo.json".to_string(),
+            cursor_position: "apply -f .".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator(" /"));
+
+        assert_eq!("ple", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "ap".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor());
+        assert_eq!("ple", Document {
+            text: "apple bana".to_string(),
+            cursor_position: "ap".len() as i32,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator(""));
+
+        assert_eq!("くけこ", Document {
+            text: "あいうえお かきくけこ さしすせそ".to_string(),
+            cursor_position: 8,
+            ..Default::default()
+        }.get_word_after_cursor());
+        assert_eq!("くけこ", Document {
+            text: "あいうえお かきくけこ さしすせそ".to_string(),
+            cursor_position: 8,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator(""));
+
+        assert_eq!("нь", Document {
+            text: "Добрый день Добрый день".to_string(),
+            cursor_position: 9,
+            ..Default::default()
+        }.get_word_after_cursor());
+        assert_eq!("нь", Document {
+            text: "Добрый день Добрый день".to_string(),
+            cursor_position: 9,
+            ..Default::default()
+        }.get_word_after_cursor_until_separator(""));
+    }
+
+    #[test]
+    fn test_current_line_before_cursor() {
+        assert_eq!("lin", Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nlin".len() as i32,
+            ..Default::default()
+        }.current_line_before_cursor());
+    }
+
+    #[test]
+    fn test_current_line_after_cursor() {
+        assert_eq!("e 2", Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nlin".len() as i32,
+            ..Default::default()
+        }.current_line_after_cursor());
+    }
+
+    #[test]
+    fn test_current_line() {
+        assert_eq!("line 2", Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nlin".len() as i32,
+            ..Default::default()
+        }.current_line());
+    }
 }
