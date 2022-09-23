@@ -1,4 +1,3 @@
-mod key;
 mod completion;
 mod document;
 
