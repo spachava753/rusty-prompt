@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::ops::Index;
 use crossterm::event::KeyCode;
 use unicode_width::UnicodeWidthChar;
@@ -281,7 +282,82 @@ impl Document {
         self.current_line_before_cursor() + self.current_line_after_cursor().as_str()
     }
 
+    /// Returns a Vec of all the lines.
+    // TODO: do we have to map to String?
+    fn lines(&self) -> Vec<String> {
+        self.text.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
+    }
 
+    /// Return the number of lines in this document. If the document ends
+    /// with a trailing \n, that counts as the beginning of a new line.
+    fn line_count(&self) -> usize {
+        self.lines().len()
+    }
+
+    /// Array pointing to the start indexes of all the lines.
+    fn line_start_indexes(&self) -> Vec<usize> {
+        // TODO: Cache, because this is often reused.
+        // (If it is used, it's often used many times.
+        // And this has to be fast for editing big documents!)
+        let lc = self.line_count();
+        let lengths = self.lines()
+            .into_iter()
+            .map(|l| l.len())
+            .collect::<Vec<_>>();
+
+        let mut indexes = Vec::with_capacity(lc + 1);
+        indexes.push(0); // https://github.com/jonathanslenders/python-prompt-toolkit/blob/master/prompt_toolkit/document.py#L189
+        let mut pos = 0;
+        for l in lengths {
+            pos += l + 1;
+            indexes.push(pos);
+        }
+        if lc > 1 {
+            // Pop the last item. (This is not a new line.)
+            indexes.pop().expect("expected to be able to pop last index");
+        }
+        indexes
+    }
+
+    /// For the index of a character at a certain line, calculate the index of
+    /// the first character on that line.
+    fn find_line_start_index(&self, index: usize) -> (usize, usize) {
+        let indexes = self.line_start_indexes();
+        let pos = bisect::right(&indexes, index) - 1;
+        (pos, indexes[pos])
+    }
+}
+
+mod bisect {
+    use std::cmp::Ordering;
+
+    pub fn right(a: &[usize], v: usize) -> usize {
+        bisect_right_range(a, v, 0, a.len())
+    }
+
+    fn bisect_right_range(a: &[usize], v: usize, lo: usize, hi: usize) -> usize {
+        let s = &a[lo..hi];
+        s.partition_point(|&probe| {
+            probe < v
+        })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_bisect_right() {
+            let input = vec![1, 2, 3, 3, 3, 6, 7];
+
+            let r = right(&input, 0);
+            assert_eq!(0, r, "number 0 should inserted at 0 position, but got {}", r);
+            let r = right(&input, 4);
+            assert_eq!(5, r, "number 4 should inserted at 5 position, but got {}", r);
+            let r = right(&input, 8);
+            assert_eq!(7, r, "number 8 should inserted at 7 position, but got {}", r);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -672,7 +748,7 @@ mod tests {
             ..Default::default()
         }.find_end_of_current_word_until_separator_ignore_next_to_cursor(""));
     }
-    
+
     #[test]
     fn test_get_word_after_cursor() {
         assert_eq!("", Document {
