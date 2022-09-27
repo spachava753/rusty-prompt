@@ -284,6 +284,7 @@ impl Document {
 
     /// Returns a Vec of all the lines.
     // TODO: do we have to map to String?
+    // TODO: we can optimize to not create a Vec every time
     fn lines(&self) -> Vec<String> {
         self.text.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
     }
@@ -326,6 +327,90 @@ impl Document {
         let pos = bisect::right(&indexes, index) - 1;
         (pos, indexes[pos])
     }
+
+    /// Returns the current row. (0-based.)
+    fn cursor_position_row(&self) -> usize {
+        self.find_line_start_index(self.cursor_position as usize).0
+    }
+
+    /// Returns the current column. (0-based.)
+    fn cursor_position_col(&self) -> usize {
+        self.cursor_position as usize - self.find_line_start_index(self.cursor_position as usize).1
+    }
+
+    /// returns the relative position for cursor left.
+    fn get_cursor_left_position(&self, count: i32) -> i32 {
+        if count < 0 {
+            return self.get_cursor_right_position(-count);
+        }
+        if self.cursor_position_col() > count as usize {
+            return -count;
+        }
+        -(self.cursor_position_col() as i32)
+    }
+
+    /// returns relative position for cursor right.
+    fn get_cursor_right_position(&self, count: i32) -> i32 {
+        if count < 0 {
+            return self.get_cursor_left_position(-count);
+        }
+        if self.current_line_after_cursor().len() > count as usize {
+            return count;
+        }
+        self.current_line_after_cursor().len() as i32
+    }
+
+    /// return the relative cursor position (character index) where we would be
+    /// if the user pressed the arrow-up button.
+    fn get_cursor_up_position(&self, count: i32, preferred_column: Option<usize>) -> i32 {
+        let col = if let Some(n) = preferred_column {
+            n
+        } else {
+            self.cursor_position_col()
+        };
+
+        let row = (self.cursor_position_row() as i32 - count)
+            .max(0) as usize;
+        self.translate_row_col_to_index(row, col) as i32 - self.cursor_position
+    }
+
+    /// return the relative cursor position (character index) where we would be if the
+    /// user pressed the arrow-down button.
+    fn get_cursor_down_position(&self, count: i32, preferred_column: Option<usize>) -> i32 {
+        let col = if let Some(n) = preferred_column {
+            n
+        } else {
+            self.cursor_position_col()
+        };
+
+        let row = self.cursor_position_row() as i32 + count;
+        self.translate_row_col_to_index(row as usize, col) as i32 - self.cursor_position
+    }
+
+    /// given a (row, col), return the corresponding index.
+    /// (Row and col params are 0-based.)
+    fn translate_row_col_to_index(&self, row: usize, column: usize) -> usize {
+        let indexes = self.line_start_indexes();
+        let row = row.clamp(0, indexes.len() - 1);
+        let line = {
+            let lines = self.lines();
+            lines.get(row)
+                .expect(format!("line row {} does not exist", row)
+                    .as_str())
+                .clone()
+        };
+
+        let index = if column > 0 || line.len() > 0 {
+            if column > line.len() {
+                indexes[row] + line.len()
+            } else {
+                indexes[row] + column
+            }
+        } else {
+            indexes[row]
+        }.clamp(0, self.text.len());
+        index
+    }
 }
 
 mod bisect {
@@ -338,7 +423,7 @@ mod bisect {
     fn bisect_right_range(a: &[usize], v: usize, lo: usize, hi: usize) -> usize {
         let s = &a[lo..hi];
         s.partition_point(|&probe| {
-            probe < v
+            probe <= v
         })
     }
 
@@ -356,6 +441,13 @@ mod bisect {
             assert_eq!(5, r, "number 4 should inserted at 5 position, but got {}", r);
             let r = right(&input, 8);
             assert_eq!(7, r, "number 8 should inserted at 7 position, but got {}", r);
+        }
+
+        #[test]
+        fn extra_scenario() {
+            let input = vec![0, 1];
+            let r = right(&input, 0);
+            assert_eq!(1, r, "number 0 should inserted at 1 position, but got {}", r);
         }
     }
 }
@@ -855,5 +947,90 @@ mod tests {
             cursor_position: "line 1\nlin".len() as i32,
             ..Default::default()
         }.current_line());
+    }
+
+    #[test]
+    fn test_cursor_position_row_and_col() {
+        assert_eq!(1, Document {
+            text: "line 1\nline 2\nline 3\n".to_string(),
+            cursor_position: "line 1\nlin".len() as i32,
+            ..Default::default()
+        }.cursor_position_row());
+        assert_eq!(3, Document {
+            text: "line 1\nline 2\nline 3\n".to_string(),
+            cursor_position: "line 1\nlin".len() as i32,
+            ..Default::default()
+        }.cursor_position_col());
+
+        assert_eq!(0, Document {
+            text: "".to_string(),
+            cursor_position: 0,
+            ..Default::default()
+        }.cursor_position_row());
+        assert_eq!(0, Document {
+            text: "".to_string(),
+            cursor_position: 0,
+            ..Default::default()
+        }.cursor_position_col());
+    }
+
+    #[test]
+    fn test_get_cursor_left_position() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nline 2\nlin".len() as i32,
+            ..Default::default()
+        };
+        assert_eq!(-2, d.get_cursor_left_position(2));
+        assert_eq!(-3, d.get_cursor_left_position(10));
+    }
+
+    #[test]
+    fn test_get_cursor_right_position() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nline 2\nlin".len() as i32,
+            ..Default::default()
+        };
+        assert_eq!(2, d.get_cursor_right_position(2));
+        assert_eq!(3, d.get_cursor_right_position(10));
+    }
+
+    #[test]
+    fn test_get_cursor_up_position() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nline 2\nlin".len() as i32,
+            ..Default::default()
+        };
+        assert_eq!("lin".len() as i32 - "line 1\nline 2\nlin".len() as i32,
+                   d.get_cursor_up_position(2, None));
+        assert_eq!("lin".len() as i32 - "line 1\nline 2\nlin".len() as i32,
+                   d.get_cursor_up_position(100, None));
+    }
+
+    #[test]
+    fn test_get_cursor_down_position() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "lin".len() as i32,
+            ..Default::default()
+        };
+        assert_eq!("line 1\nline 2\nlin".len() as i32 - "lin".len() as i32,
+                   d.get_cursor_down_position(2, None));
+        assert_eq!("line 1\nline 2\nline 3\nline 4\n".len() as i32 - "lin".len() as i32,
+                   d.get_cursor_down_position(100, None));
+    }
+
+    #[test]
+    fn test_translate_row_col_to_index() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nlin".len() as i32,
+            ..Default::default()
+        };
+        assert_eq!("line 1\nline 2\nlin".len(),
+                   d.translate_row_col_to_index(2, 3));
+        assert_eq!(0, d.translate_row_col_to_index(0, 0));
     }
 }
