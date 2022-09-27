@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::ops::Index;
+use std::process::id;
 use crossterm::event::KeyCode;
 use unicode_width::UnicodeWidthChar;
 
@@ -387,7 +388,7 @@ impl Document {
         self.translate_row_col_to_index(row as usize, col) as i32 - self.cursor_position
     }
 
-    /// given a (row, col), return the corresponding index.
+    /// Given a (row, col), return the corresponding index.
     /// (Row and col params are 0-based.)
     fn translate_row_col_to_index(&self, row: usize, column: usize) -> usize {
         let indexes = self.line_start_indexes();
@@ -410,6 +411,29 @@ impl Document {
             indexes[row]
         }.clamp(0, self.text.len());
         index
+    }
+
+    /// Given an index for the text, return the corresponding (row, col) tuple.
+    /// (0-based. Returns (0, 0) for index=0.)
+    fn translate_index_to_position(&self, index: usize) -> (usize, usize) {
+        let (row, row_index) = self.find_line_start_index(index);
+        (row, index - row_index)
+    }
+
+    /// Returns true when we are at the last line.
+    fn on_last_line(&self) -> bool {
+        self.cursor_position_row() == self.line_count() - 1
+    }
+
+    /// Returns relative position for the end of this line.
+    fn get_end_of_line_position(&self) -> usize {
+        self.current_line_after_cursor().chars().count()
+    }
+
+    fn leading_whitespace_in_current_line(&self) -> String {
+        let trimmed = self.current_line();
+        let idx = self.current_line().len() - trimmed.trim().len();
+        self.current_line()[..idx].to_string()
     }
 }
 
@@ -1032,5 +1056,44 @@ mod tests {
         assert_eq!("line 1\nline 2\nlin".len(),
                    d.translate_row_col_to_index(2, 3));
         assert_eq!(0, d.translate_row_col_to_index(0, 0));
+    }
+
+    #[test]
+    fn test_translate_index_to_position() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3\nline 4\n".to_string(),
+            cursor_position: "line 1\nlin".len() as i32,
+            ..Default::default()
+        };
+        assert_eq!((2, 3),
+                   d.translate_index_to_position("line 1\nline 2\nlin"
+                       .len()));
+        assert_eq!((0, 0),
+                   d.translate_index_to_position(0));
+    }
+
+    #[test]
+    fn test_on_last_line() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3".to_string(),
+            cursor_position: "line 1\nline".len() as i32,
+            ..Default::default()
+        };
+        assert!(!d.on_last_line());
+        let d = Document {
+            cursor_position: "line 1\nline 2\nline".len() as i32,
+            ..d
+        };
+        assert!(d.on_last_line());
+    }
+
+    #[test]
+    fn test_get_end_of_line_position() {
+        let d = Document {
+            text: "line 1\nline 2\nline 3".to_string(),
+            cursor_position: "line 1\nli".len() as i32,
+            ..Default::default()
+        };
+        assert_eq!("ne 2".len(), d.get_end_of_line_position());
     }
 }
