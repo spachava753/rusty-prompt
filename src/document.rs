@@ -1,6 +1,3 @@
-use std::cmp::Ordering;
-use std::ops::Index;
-use std::process::id;
 use crossterm::event::KeyCode;
 use unicode_width::UnicodeWidthChar;
 
@@ -44,14 +41,14 @@ impl Document {
     fn get_char_relative_to_cursor(&self, offset: i32) -> char {
         let mut s = self.text.clone();
         let mut count = 0;
-        while s.len() > 0 {
+        while !s.is_empty() {
             count += 1;
             let temp = s.chars().take(1)
                 .map(|c| (c, c.len_utf8()))
                 .collect::<Vec<_>>();
             let (c, size) = temp.first().unwrap();
             if count == self.cursor_position + offset {
-                return c.clone();
+                return *c;
             }
             s = s.split_at(*size).1.to_string();
         }
@@ -90,7 +87,7 @@ impl Document {
     fn find_start_of_previous_word_with_space(&self) -> i32 {
         let end = self.text_before_cursor()
             .rfind(|c| c != ' ');
-        if let None = end {
+        if end.is_none() {
             return 0;
         }
         let start = self.text_before_cursor()
@@ -149,7 +146,7 @@ impl Document {
     fn find_end_of_current_word(&self) -> i32 {
         self.text_after_cursor()
             .find(' ')
-            .unwrap_or(self.text_after_cursor().len()) as i32
+            .unwrap_or_else(|| self.text_after_cursor().len()) as i32
     }
 
     /// Is almost the same as [find_end_of_current_word].
@@ -180,7 +177,7 @@ impl Document {
         } else {
             self.text_after_cursor()
                 .find(|c| sep.contains(c))
-                .unwrap_or(self.text_after_cursor().len()) as i32
+                .unwrap_or_else(|| self.text_after_cursor().len()) as i32
         }
     }
 
@@ -396,12 +393,11 @@ impl Document {
         let line = {
             let lines = self.lines();
             lines.get(row)
-                .expect(format!("line row {} does not exist", row)
-                    .as_str())
+                .unwrap_or_else(|| panic!("line row {} does not exist", row))
                 .clone()
         };
 
-        let index = if column > 0 || line.len() > 0 {
+        if column > 0 || !line.is_empty() {
             if column > line.len() {
                 indexes[row] + line.len()
             } else {
@@ -409,8 +405,7 @@ impl Document {
             }
         } else {
             indexes[row]
-        }.clamp(0, self.text.len());
-        index
+        }.clamp(0, self.text.len())
     }
 
     /// Given an index for the text, return the corresponding (row, col) tuple.
@@ -438,8 +433,6 @@ impl Document {
 }
 
 mod bisect {
-    use std::cmp::Ordering;
-
     pub fn right(a: &[usize], v: usize) -> usize {
         bisect_right_range(a, v, 0, a.len())
     }
